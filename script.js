@@ -22,6 +22,18 @@ document.addEventListener('DOMContentLoaded', function() {
     updateAllDisplays();
     initializeCharts();
     setupEventListeners();
+    
+    // Handle window resize for better chart responsiveness
+    window.addEventListener('resize', function() {
+        setTimeout(() => {
+            if (overviewChart) {
+                overviewChart.resize();
+            }
+            if (monthlyChart) {
+                monthlyChart.resize();
+            }
+        }, 100);
+    });
 });
 
 // Setup event listeners for forms
@@ -144,21 +156,90 @@ function updateAllDisplays() {
 
 // Update transactions list
 function updateTransactionsList() {
-    const recentTransactions = transactions
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 10);
+    // Group transactions by month
+    const groupedTransactions = groupTransactionsByMonth();
     
     transactionsListElement.innerHTML = '';
     
-    if (recentTransactions.length === 0) {
+    if (Object.keys(groupedTransactions).length === 0) {
         transactionsListElement.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No transactions yet. Add your first transaction above!</p>';
         return;
     }
     
-    recentTransactions.forEach(transaction => {
-        const transactionElement = createTransactionElement(transaction);
-        transactionsListElement.appendChild(transactionElement);
+    // Sort months in descending order (most recent first)
+    const sortedMonths = Object.keys(groupedTransactions).sort((a, b) => new Date(b) - new Date(a));
+    
+    sortedMonths.forEach(monthKey => {
+        const monthData = groupedTransactions[monthKey];
+        const monthElement = createMonthGroupElement(monthKey, monthData);
+        transactionsListElement.appendChild(monthElement);
     });
+}
+
+// Group transactions by month
+function groupTransactionsByMonth() {
+    const grouped = {};
+    
+    transactions.forEach(transaction => {
+        const date = new Date(transaction.date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!grouped[monthKey]) {
+            grouped[monthKey] = {
+                transactions: [],
+                totals: {
+                    income: 0,
+                    expense: 0,
+                    savings: 0,
+                    'credit-card': 0
+                }
+            };
+        }
+        
+        grouped[monthKey].transactions.push(transaction);
+        grouped[monthKey].totals[transaction.type] += transaction.amount;
+    });
+    
+    return grouped;
+}
+
+// Create month group element
+function createMonthGroupElement(monthKey, monthData) {
+    const div = document.createElement('div');
+    div.className = 'month-group';
+    
+    const date = new Date(monthKey + '-01');
+    const monthName = date.toLocaleDateString('en-IN', { 
+        year: 'numeric', 
+        month: 'long' 
+    });
+    
+    const netAmount = monthData.totals.income - monthData.totals.expense - monthData.totals.savings - monthData.totals['credit-card'];
+    
+    div.innerHTML = `
+        <div class="month-header">
+            <h4>${monthName}</h4>
+            <div class="month-summary">
+                <span class="month-net ${netAmount >= 0 ? 'positive' : 'negative'}">
+                    Net: ${formatCurrency(Math.abs(netAmount))} ${netAmount >= 0 ? '💰' : '💸'}
+                </span>
+            </div>
+        </div>
+        <div class="month-totals">
+            <span class="total-item income">Income: ${formatCurrency(monthData.totals.income)}</span>
+            <span class="total-item expense">Expenses: ${formatCurrency(monthData.totals.expense)}</span>
+            <span class="total-item savings">Savings: ${formatCurrency(monthData.totals.savings)}</span>
+            <span class="total-item credit-card">Credit Card: ${formatCurrency(monthData.totals['credit-card'])}</span>
+        </div>
+        <div class="month-transactions">
+            ${monthData.transactions
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .map(transaction => createTransactionElement(transaction).outerHTML)
+                .join('')}
+        </div>
+    `;
+    
+    return div;
 }
 
 // Create transaction element
@@ -224,6 +305,16 @@ function createOverviewChart() {
     
     const totals = calculateTotals();
     
+    // Calculate total for scaling
+    const totalAmount = totals.income + totals.expense + totals.savings + totals['credit-card'];
+    
+    // Determine chart size based on data
+    const chartHeight = totalAmount > 0 ? Math.max(300, Math.min(500, 300 + (totalAmount / 1000) * 50)) : 300;
+    
+    // Set canvas height dynamically
+    const canvas = document.getElementById('overviewChart');
+    canvas.style.height = `${chartHeight}px`;
+    
     overviewChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -250,7 +341,7 @@ function createOverviewChart() {
                         padding: 20,
                         usePointStyle: true,
                         font: {
-                            size: 12
+                            size: Math.max(10, Math.min(14, 12 + (totalAmount / 10000)))
                         }
                     }
                 },
@@ -259,7 +350,8 @@ function createOverviewChart() {
                         label: function(context) {
                             const label = context.label || '';
                             const value = context.parsed;
-                            return `${label}: ${formatCurrency(value)}`;
+                            const percentage = totalAmount > 0 ? ((value / totalAmount) * 100).toFixed(1) : 0;
+                            return `${label}: ${formatCurrency(value)} (${percentage}%)`;
                         }
                     }
                 }
@@ -273,6 +365,19 @@ function createMonthlyChart() {
     const ctx = document.getElementById('monthlyChart').getContext('2d');
     
     const monthlyData = getMonthlyData();
+    
+    // Calculate maximum value for scaling
+    const allValues = [...monthlyData.income, ...monthlyData.expenses, ...monthlyData.savings, ...monthlyData.creditCard];
+    const maxValue = Math.max(...allValues, 1);
+    
+    // Determine chart height based on data complexity and values
+    const hasData = allValues.some(value => value > 0);
+    const dataPoints = monthlyData.labels.length;
+    const chartHeight = hasData ? Math.max(300, Math.min(600, 300 + (maxValue / 1000) * 30 + dataPoints * 20)) : 300;
+    
+    // Set canvas height dynamically
+    const canvas = document.getElementById('monthlyChart');
+    canvas.style.height = `${chartHeight}px`;
     
     monthlyChart = new Chart(ctx, {
         type: 'bar',
@@ -306,6 +411,19 @@ function createMonthlyChart() {
                     backgroundColor: '#FF9800',
                     borderColor: '#FF9800',
                     borderWidth: 1
+                },
+                {
+                    label: 'Net Amount',
+                    data: monthlyData.net,
+                    type: 'line',
+                    borderColor: '#9C27B0',
+                    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                    borderWidth: 3,
+                    fill: false,
+                    pointBackgroundColor: '#9C27B0',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 6
                 }
             ]
         },
@@ -318,6 +436,16 @@ function createMonthlyChart() {
                     ticks: {
                         callback: function(value) {
                             return formatCurrency(value);
+                        },
+                        font: {
+                            size: Math.max(10, Math.min(12, 11 + (maxValue / 10000)))
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: Math.max(10, Math.min(12, 11 + (dataPoints / 6)))
                         }
                     }
                 }
@@ -327,7 +455,10 @@ function createMonthlyChart() {
                     position: 'top',
                     labels: {
                         usePointStyle: true,
-                        padding: 20
+                        padding: 20,
+                        font: {
+                            size: Math.max(10, Math.min(14, 12 + (maxValue / 10000)))
+                        }
                     }
                 },
                 tooltip: {
@@ -355,7 +486,8 @@ function getMonthlyData() {
         income: [],
         expenses: [],
         savings: [],
-        creditCard: []
+        creditCard: [],
+        net: []
     };
     
     // Get last 6 months
@@ -385,10 +517,13 @@ function getMonthlyData() {
             monthTotals[t.type] += t.amount;
         });
         
+        const netAmount = monthTotals.income - monthTotals.expense - monthTotals.savings - monthTotals['credit-card'];
+        
         monthlyData.income.push(monthTotals.income);
         monthlyData.expenses.push(monthTotals.expense);
         monthlyData.savings.push(monthTotals.savings);
         monthlyData.creditCard.push(monthTotals['credit-card']);
+        monthlyData.net.push(netAmount);
     }
     
     return monthlyData;
@@ -398,22 +533,50 @@ function getMonthlyData() {
 function updateCharts() {
     if (overviewChart) {
         const totals = calculateTotals();
+        const totalAmount = totals.income + totals.expense + totals.savings + totals['credit-card'];
+        
+        // Update chart height based on new data
+        const chartHeight = totalAmount > 0 ? Math.max(300, Math.min(500, 300 + (totalAmount / 1000) * 50)) : 300;
+        const canvas = document.getElementById('overviewChart');
+        canvas.style.height = `${chartHeight}px`;
+        
         overviewChart.data.datasets[0].data = [
             totals.income, 
             totals.expense, 
             totals.savings, 
             totals['credit-card']
         ];
+        
+        // Update font sizes
+        overviewChart.options.plugins.legend.labels.font.size = Math.max(10, Math.min(14, 12 + (totalAmount / 10000)));
+        
         overviewChart.update();
     }
     
     if (monthlyChart) {
         const monthlyData = getMonthlyData();
+        const allValues = [...monthlyData.income, ...monthlyData.expenses, ...monthlyData.savings, ...monthlyData.creditCard, ...monthlyData.net];
+        const maxValue = Math.max(...allValues, 1);
+        const hasData = allValues.some(value => value > 0);
+        const dataPoints = monthlyData.labels.length;
+        
+        // Update chart height based on new data
+        const chartHeight = hasData ? Math.max(300, Math.min(600, 300 + (maxValue / 1000) * 30 + dataPoints * 20)) : 300;
+        const canvas = document.getElementById('monthlyChart');
+        canvas.style.height = `${chartHeight}px`;
+        
         monthlyChart.data.labels = monthlyData.labels;
         monthlyChart.data.datasets[0].data = monthlyData.income;
         monthlyChart.data.datasets[1].data = monthlyData.expenses;
         monthlyChart.data.datasets[2].data = monthlyData.savings;
         monthlyChart.data.datasets[3].data = monthlyData.creditCard;
+        monthlyChart.data.datasets[4].data = monthlyData.net;
+        
+        // Update font sizes
+        monthlyChart.options.scales.y.ticks.font.size = Math.max(10, Math.min(12, 11 + (maxValue / 10000)));
+        monthlyChart.options.scales.x.ticks.font.size = Math.max(10, Math.min(12, 11 + (dataPoints / 6)));
+        monthlyChart.options.plugins.legend.labels.font.size = Math.max(10, Math.min(14, 12 + (maxValue / 10000)));
+        
         monthlyChart.update();
     }
 }
@@ -452,6 +615,24 @@ function addSampleData() {
         saveToLocalStorage();
         updateAllDisplays();
         updateCharts();
+    }
+}
+
+// Function to calculate optimal chart dimensions based on data
+function calculateChartDimensions(data, chartType = 'overview') {
+    if (chartType === 'overview') {
+        const totalAmount = data.reduce((sum, value) => sum + value, 0);
+        return {
+            height: totalAmount > 0 ? Math.max(300, Math.min(500, 300 + (totalAmount / 1000) * 50)) : 300,
+            fontSize: Math.max(10, Math.min(14, 12 + (totalAmount / 10000)))
+        };
+    } else {
+        const maxValue = Math.max(...data, 1);
+        const dataPoints = data.length;
+        return {
+            height: Math.max(300, Math.min(600, 300 + (maxValue / 1000) * 30 + dataPoints * 20)),
+            fontSize: Math.max(10, Math.min(14, 12 + (maxValue / 10000)))
+        };
     }
 }
 
