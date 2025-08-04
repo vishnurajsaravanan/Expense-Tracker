@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Expense Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💰 Indian Expense Tracker</h1>
+            <p>Track your income, expenses, savings, and credit card bills</p>
+        </header>
+
+        <!-- Cash in Hand Card -->
+        <div class="cash-card">
+            <div class="cash-header">
+                <h2>💵 Cash in Hand</h2>
+                <div class="cash-amount" id="cashInHand">₹0</div>
+            </div>
+            <div class="cash-formula">
+                <p>Formula: Income - Expenses - Savings - Credit Card Bills</p>
+            </div>
+        </div>
+
+        <!-- Input Forms -->
+        <div class="forms-container">
+            <div class="form-section">
+                <h3>➕ Add Income</h3>
+                <form id="incomeForm">
+                    <input type="text" id="incomeDescription" placeholder="Income description" required>
+                    <input type="number" id="incomeAmount" placeholder="Amount in ₹" required>
+                    <button type="submit">Add Income</button>
+                </form>
+            </div>
+
+            <div class="form-section">
+                <h3>➖ Add Expense</h3>
+                <form id="expenseForm">
+                    <input type="text" id="expenseDescription" placeholder="Expense description" required>
+                    <input type="number" id="expenseAmount" placeholder="Amount in ₹" required>
+                    <button type="submit">Add Expense</button>
+                </form>
+            </div>
+
+            <div class="form-section">
+                <h3>💾 Add Savings</h3>
+                <form id="savingsForm">
+                    <input type="text" id="savingsDescription" placeholder="Savings description" required>
+                    <input type="number" id="savingsAmount" placeholder="Amount in ₹" required>
+                    <button type="submit">Add Savings</button>
+                </form>
+            </div>
+
+            <div class="form-section">
+                <h3>💳 Add Credit Card Bill</h3>
+                <form id="creditCardForm">
+                    <input type="text" id="creditCardDescription" placeholder="Credit card description" required>
+                    <input type="number" id="creditCardAmount" placeholder="Amount in ₹" required>
+                    <button type="submit">Add Credit Card Bill</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-container">
+            <div class="summary-card income">
+                <h3>Total Income</h3>
+                <div class="amount" id="totalIncome">₹0</div>
+            </div>
+            <div class="summary-card expense">
+                <h3>Total Expenses</h3>
+                <div class="amount" id="totalExpenses">₹0</div>
+            </div>
+            <div class="summary-card savings">
+                <h3>Total Savings</h3>
+                <div class="amount" id="totalSavings">₹0</div>
+            </div>
+            <div class="summary-card credit-card">
+                <h3>Total Credit Card Bills</h3>
+                <div class="amount" id="totalCreditCard">₹0</div>
+            </div>
+        </div>
+
+        <!-- Transactions List -->
+        <div class="transactions-container">
+            <h3>📋 Recent Transactions</h3>
+            <div class="transactions-list" id="transactionsList">
+                <!-- Transactions will be added here dynamically -->
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-container">
+            <div class="chart-section">
+                <h3>📊 Financial Overview</h3>
+                <canvas id="overviewChart"></canvas>
+            </div>
+            <div class="chart-section">
+                <h3>📈 Monthly Breakdown</h3>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
